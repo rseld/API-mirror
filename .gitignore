@@ -1,0 +1,11 @@
+.env
+dist
+build
+.cache
+.gocache
+*.exe
+*.txt
+bin/
+dist/
+logs/
+tmp/
