@@ -3,6 +3,8 @@ dist
 build
 .cache
 .gocache
+*.so
+*.dll
 *.exe
 *.txt
 bin/
