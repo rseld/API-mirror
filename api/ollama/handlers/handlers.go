@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -34,22 +35,83 @@ func ChatHandler(store *fixtures.FixtureStore[types.ChatResponse]) http.HandlerF
 		}
 
 		if req.Stream == nil || *req.Stream {
-			http.Error(w, "streaming not implemented yet", http.StatusNotImplemented)
+			handleStreaming(w, req, store)
+		} else {
+			handleNonStreaming(w, req, store)
+		}
+
+	}
+}
+
+func handleNonStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtures.FixtureStore[types.ChatResponse]) {
+
+	resp, err := store.Get()
+	if err != nil {
+		http.Error(w, "fixture unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	resp.Model = req.Model
+	resp.CreatedAt = time.Now().Format(time.RFC3339)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("failed to encode chat response: %v", err)
+	}
+}
+
+func handleStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtures.FixtureStore[types.ChatResponse]) {
+
+	resp, err := store.Get()
+	if err != nil {
+		http.Error(w, "fixture unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	// check if w supports flushing beforehand
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+
+	words := strings.Fields(resp.Message.Content)
+	encode := json.NewEncoder(w)
+
+	for _, word := range words {
+		chunk := types.ChatResponse{
+			Model:     req.Model,
+			CreatedAt: time.Now().Format(time.RFC3339),
+			Message: types.Message{
+				Role:    resp.Message.Role,
+				Content: word + " ",
+			},
+			Done: false,
+		}
+
+		if err := encode.Encode(chunk); err != nil {
+			log.Printf("failed to encode chat chunk: %v", err)
 			return
 		}
 
-		resp, err := store.Get()
-		if err != nil {
-			http.Error(w, "fixture unavailable", http.StatusInternalServerError)
-			return
-		}
+		flusher.Flush()
 
-		resp.Model = req.Model
-		resp.CreatedAt = time.Now().Format(time.RFC3339)
+		time.Sleep(100 * time.Millisecond)
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("failed to encode chat response: %v", err)
-		}
+	final := types.ChatResponse{
+		Model:     req.Model,
+		CreatedAt: time.Now().Format(time.RFC3339),
+		Message: types.Message{
+			Role:    resp.Message.Role,
+			Content: "",
+		},
+		Done: true,
+	}
+
+	if err := encode.Encode(final); err != nil {
+		log.Printf("failed to encode final chat chunk: %v", err)
 	}
 }

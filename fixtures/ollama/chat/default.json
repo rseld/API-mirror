@@ -2,7 +2,7 @@
   "model": "model_ex",
   "message": {
     "role": "example",
-    "content": "example content"
+    "content": "example content that is padded to make it longer for testing streaming case"
      },
   "done": true,
   "done_reason": "stop",
