@@ -4,6 +4,7 @@ build
 .cache
 .gocache
 *.so
+*.log
 *.dll
 *.exe
 *.txt

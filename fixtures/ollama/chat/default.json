@@ -1,0 +1,15 @@
+{
+  "model": "model_ex",
+  "message": {
+    "role": "example",
+    "content": "example content"
+     },
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 123,
+  "load_duration": 123,
+  "prompt_eval_count": 123,
+  "prompt_eval_duration": 123,
+  "eval_count": 123,
+  "eval_duration": 123
+}
