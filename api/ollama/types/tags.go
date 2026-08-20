@@ -18,6 +18,6 @@ type ModelDetails struct {
 	Format            string   `json:"format"`
 	Family            string   `json:"family"`
 	Families          []string `json:"families,omitempty"`
-	ParameterSet      string   `json:"parameter_set"`
+	ParameterSize     string   `json:"parameter_size"`
 	QuantizationLevel string   `json:"quantization_level"`
 }
