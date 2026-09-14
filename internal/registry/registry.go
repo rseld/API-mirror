@@ -3,6 +3,7 @@ package registry
 import (
 	"fmt"
 	"net/http"
+	"sort"
 )
 
 type Registry struct {
@@ -28,4 +29,13 @@ func (r *Registry) Build() *http.ServeMux {
 		mux.HandleFunc(pattern, handler)
 	}
 	return mux
+}
+
+func (r *Registry) Routes() []string {
+	routes := make([]string, 0, len(r.routes))
+	for pattern := range r.routes {
+		routes = append(routes, pattern)
+	}
+	sort.Strings(routes)
+	return routes
 }

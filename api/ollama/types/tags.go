@@ -1,4 +1,4 @@
-package types
+package ollamatypes
 
 type ListResponse struct {
 	Models []ListModelResponse `json:"models"`

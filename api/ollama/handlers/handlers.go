@@ -1,4 +1,4 @@
-package handlers
+package ollamahandlers
 
 import (
 	"API-mirror/api/ollama/types"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TagsHandler(store *fixtures.FixtureStore[types.ListResponse]) http.HandlerFunc {
+func TagsHandler(store *fixtures.FixtureStore[ollamatypes.ListResponse]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp, err := store.Get()
 		if err != nil {
@@ -26,9 +26,9 @@ func TagsHandler(store *fixtures.FixtureStore[types.ListResponse]) http.HandlerF
 	}
 }
 
-func ChatHandler(store *fixtures.FixtureStore[types.ChatResponse]) http.HandlerFunc {
+func ChatHandler(store *fixtures.FixtureStore[ollamatypes.ChatResponse]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req types.ChatRequest
+		var req ollamatypes.ChatRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
@@ -43,7 +43,7 @@ func ChatHandler(store *fixtures.FixtureStore[types.ChatResponse]) http.HandlerF
 	}
 }
 
-func handleNonStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtures.FixtureStore[types.ChatResponse]) {
+func handleNonStreaming(w http.ResponseWriter, req ollamatypes.ChatRequest, store *fixtures.FixtureStore[ollamatypes.ChatResponse]) {
 
 	resp, err := store.Get()
 	if err != nil {
@@ -60,7 +60,7 @@ func handleNonStreaming(w http.ResponseWriter, req types.ChatRequest, store *fix
 	}
 }
 
-func handleStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtures.FixtureStore[types.ChatResponse]) {
+func handleStreaming(w http.ResponseWriter, req ollamatypes.ChatRequest, store *fixtures.FixtureStore[ollamatypes.ChatResponse]) {
 
 	resp, err := store.Get()
 	if err != nil {
@@ -81,10 +81,10 @@ func handleStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtur
 	encode := json.NewEncoder(w)
 
 	for _, word := range words {
-		chunk := types.ChatResponse{
+		chunk := ollamatypes.ChatResponse{
 			Model:     req.Model,
 			CreatedAt: time.Now().Format(time.RFC3339),
-			Message: types.Message{
+			Message: ollamatypes.Message{
 				Role:    resp.Message.Role,
 				Content: word + " ",
 			},
@@ -101,14 +101,15 @@ func handleStreaming(w http.ResponseWriter, req types.ChatRequest, store *fixtur
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	final := types.ChatResponse{
+	final := ollamatypes.ChatResponse{
 		Model:     req.Model,
 		CreatedAt: time.Now().Format(time.RFC3339),
-		Message: types.Message{
+		Message: ollamatypes.Message{
 			Role:    resp.Message.Role,
 			Content: "",
 		},
-		Done: true,
+		Done:       true,
+		DoneReason: resp.DoneReason,
 	}
 
 	if err := encode.Encode(final); err != nil {

@@ -1,4 +1,4 @@
-package types
+package ollamatypes
 
 import "encoding/json"
 
