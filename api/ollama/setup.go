@@ -29,18 +29,18 @@ func NewInstance() (*server.ServerInstance, error) {
 	}
 
 	mux := reg.Build()
-	instance := &http.Server{
+	serv := &http.Server{
 		Addr:    ":11434",
 		Handler: mux,
 	}
 
 	return &server.ServerInstance{
 		Name:     "ollama",
-		Server:   instance,
+		Server:   serv,
 		Registry: reg,
 		Reloads: []server.ReloadEntry{
-			{Name: "tags", Dir: "fixtures/ollama/tags", Store: tagsStore},
-			{Name: "chat", Dir: "fixtures/ollama/chat", Store: chatStore},
+			{Name: "tags", Dir: "../../fixtures/ollama/tags", Store: tagsStore},
+			{Name: "chat", Dir: "../../fixtures/ollama/chat", Store: chatStore},
 		},
 	}, nil
 }

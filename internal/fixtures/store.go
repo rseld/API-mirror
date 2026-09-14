@@ -22,7 +22,7 @@ func (s *FixtureStore[T]) Get() (T, error) {
 	val, ok := s.entries[s.active]
 	if !ok {
 		var zero T
-		return zero, fmt.Errorf("No fixture loaded for scenario %q", s.active)
+		return zero, fmt.Errorf("no fixture loaded for scenario %q", s.active)
 	}
 
 	return val, nil

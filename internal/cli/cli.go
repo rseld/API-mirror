@@ -19,18 +19,28 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 
 			parts := strings.Fields(line)
 			cmd := parts[0]
+			arg := ""
+			if len(parts) > 1 {
+				arg = parts[1]
+			}
 			log.Printf("received command: %q", line)
 
 			switch cmd {
 			case "status":
 				log.Println("action: status")
 				for name, instance := range instances {
+					if arg != "" && name != arg {
+						continue
+					}
 					log.Printf(" %s: %s", name, instance.Server.Addr)
 				}
 
 			case "routes":
 				log.Println("action: routes")
 				for name, instance := range instances {
+					if arg != "" && name != arg {
+						continue
+					}
 					for _, r := range instance.Registry.Routes() {
 						log.Printf(" %s : %s", name, r)
 					}
@@ -40,7 +50,24 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 				log.Println("action: quit")
 				return
 
-			case "reload", "log", "start", "stop":
+			case "reload":
+				if arg == "" {
+					log.Println("usage: reload <name>")
+					break
+				}
+				log.Println("action: reload")
+				instance, ok := instances[arg]
+				if !ok {
+					log.Printf("unknown instance %q", arg)
+					break
+				}
+				if err := instance.ReloadAll(); err != nil {
+					log.Printf("reload failed: %v", err)
+				} else {
+					log.Println("reload succeeded")
+				}
+
+			case "log", "start", "stop":
 				log.Printf("action: %s (unimplemented)", cmd)
 
 			default:
