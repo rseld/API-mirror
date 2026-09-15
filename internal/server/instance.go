@@ -1,12 +1,16 @@
 package server
 
 import (
+	"API-mirror/internal/config"
 	"API-mirror/internal/registry"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
+
+var ShutdownTimeout = 5 * time.Second
 
 type Reloadable interface {
 	Load(dir, active string) error
@@ -20,9 +24,11 @@ type ReloadEntry struct {
 
 type ServerInstance struct {
 	Name     string
+	Config   config.InstanceConfig
 	Server   *http.Server
 	Registry *registry.Registry
 	Reloads  []ReloadEntry
+	Running  bool
 }
 
 type ServerEvent struct {
@@ -43,6 +49,7 @@ func startServer(name string, server *http.Server, events chan<- ServerEvent) {
 
 func (s *ServerInstance) Start(events chan<- ServerEvent) {
 	startServer(s.Name, s.Server, events)
+	s.Running = true
 }
 
 func (s *ServerInstance) Stop(ctx context.Context) error {

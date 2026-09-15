@@ -3,20 +3,22 @@ package ollama
 import (
 	"API-mirror/api/ollama/handlers"
 	"API-mirror/api/ollama/types"
+	"API-mirror/internal/config"
 	"API-mirror/internal/fixtures"
 	"API-mirror/internal/registry"
 	"API-mirror/internal/server"
+	"fmt"
 	"net/http"
 )
 
-func NewInstance() (*server.ServerInstance, error) {
+func NewInstance(cfg config.InstanceConfig) (*server.ServerInstance, error) {
 	tagsStore := &fixtures.FixtureStore[ollamatypes.ListResponse]{}
-	if err := tagsStore.Load("../../fixtures/ollama/tags", "default"); err != nil {
+	if err := tagsStore.Load(cfg.FixturesDir+"/tags", "default"); err != nil {
 		return nil, err
 	}
 
 	chatStore := &fixtures.FixtureStore[ollamatypes.ChatResponse]{}
-	if err := chatStore.Load("../../fixtures/ollama/chat", "default"); err != nil {
+	if err := chatStore.Load(cfg.FixturesDir+"/chat", "default"); err != nil {
 		return nil, err
 	}
 
@@ -30,17 +32,18 @@ func NewInstance() (*server.ServerInstance, error) {
 
 	mux := reg.Build()
 	serv := &http.Server{
-		Addr:    ":11434",
+		Addr:    fmt.Sprintf(":%d", cfg.Port),
 		Handler: mux,
 	}
 
 	return &server.ServerInstance{
-		Name:     "ollama",
+		Name:     cfg.Name,
+		Config:   cfg,
 		Server:   serv,
 		Registry: reg,
 		Reloads: []server.ReloadEntry{
-			{Name: "tags", Dir: "../../fixtures/ollama/tags", Store: tagsStore},
-			{Name: "chat", Dir: "../../fixtures/ollama/chat", Store: chatStore},
+			{Name: "tags", Dir: cfg.FixturesDir + "/tags", Store: tagsStore},
+			{Name: "chat", Dir: cfg.FixturesDir + "/chat", Store: chatStore},
 		},
 	}, nil
 }

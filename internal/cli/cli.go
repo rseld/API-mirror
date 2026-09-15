@@ -1,14 +1,21 @@
 package cli
 
 import (
+	"API-mirror/internal/config"
 	"API-mirror/internal/server"
 	"bufio"
+	"context"
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
-func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan string, serverEvents <-chan server.ServerEvent) {
+var QuitTimeout = 5 * time.Second
+
+func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan string, serverEvents chan server.ServerEvent,
+	providerBuilder map[string]func(config.InstanceConfig) (*server.ServerInstance, error)) {
+
 	for {
 		select {
 		case line, ok := <-cliInput:
@@ -32,7 +39,7 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					if arg != "" && name != arg {
 						continue
 					}
-					log.Printf(" %s: %s", name, instance.Server.Addr)
+					log.Printf(" %s: %s running: %t", name, instance.Server.Addr, instance.Running)
 				}
 
 			case "routes":
@@ -47,7 +54,48 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 				}
 
 			case "quit":
-				log.Println("action: quit")
+				force := arg == "--force"
+				log.Println("action: quit force: %t", force)
+				pending := map[string]bool{}
+				for name, instance := range instances {
+					if !instance.Running {
+						continue
+					}
+					pending[name] = true
+					go func(name string, instance *server.ServerInstance) {
+						ctx, cancel := context.WithTimeout(context.Background(), server.ShutdownTimeout)
+						defer cancel()
+						if err := instance.Stop(ctx); err != nil {
+							log.Printf("stop %s: shutdown error :%v", name, err)
+						}
+					}(name, instance)
+				}
+				if force || len(pending) == 0 {
+					return
+				}
+				timeout := time.After(QuitTimeout)
+				results := map[string]error{}
+				for len(pending) > 0 {
+					select {
+					case ev := <-serverEvents:
+						if !pending[ev.Name] {
+							log.Printf("quit: unexpected event from %q", ev.Name)
+							continue
+						}
+						results[ev.Name] = ev.Err
+						delete(pending, ev.Name)
+						log.Printf("quit: %s stopped (err=%v)", ev.Name, ev.Err)
+
+					case <-timeout:
+						names := make([]string, 0, len(pending))
+						for name := range pending {
+							names = append(names, name)
+						}
+						log.Printf("quit: timed out waiting on: %v", names)
+						return
+					}
+				}
+				log.Println("quit: all instances stopped cleanly")
 				return
 
 			case "reload":
@@ -67,7 +115,60 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					log.Println("reload succeeded")
 				}
 
-			case "log", "start", "stop":
+			case "start":
+				if arg == "" {
+					log.Println("usage: start <name>")
+					break
+				}
+				instance, ok := instances[arg]
+				if !ok {
+					log.Printf("unknown instance: %q", arg)
+					break
+				}
+				if ok && instance.Running {
+					log.Printf("start failed: %s already running", arg)
+					break
+				}
+				var cfg config.InstanceConfig
+				if ok {
+					cfg = instance.Config
+				}
+				builder := providerBuilder[cfg.Type]
+				newInstance, err := builder(cfg)
+				if err != nil {
+					log.Printf("start %s: rebuild failed: %v", arg, err)
+					break
+				}
+				newInstance.Running = true
+				instances[arg] = newInstance
+				newInstance.Start(serverEvents)
+				log.Printf("action: start %s", arg)
+
+			case "stop":
+				if arg == "" {
+					log.Println("usage: stop <name>")
+					break
+				}
+				instance, ok := instances[arg]
+				if !ok {
+					log.Printf("unknown instance: %q", arg)
+					break
+				}
+				if !instance.Running {
+					log.Printf("stop failed: %s not running", arg)
+					break
+				}
+				log.Printf("action: stop %s", arg)
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), server.ShutdownTimeout)
+					defer cancel()
+					if err := instance.Stop(ctx); err != nil {
+						log.Printf("stop %s: shutdown error: %v", instance.Name, err)
+					}
+
+				}()
+
+			case "log":
 				log.Printf("action: %s (unimplemented)", cmd)
 
 			default:
@@ -75,6 +176,13 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 			}
 
 		case ev := <-serverEvents:
+			instance, ok := instances[ev.Name]
+			if !ok {
+				log.Printf("event from unknown instance %q", ev.Name)
+				break
+			}
+			instance.Running = false
+
 			if ev.Err != nil {
 				log.Printf("server %s failed: %v", ev.Name, ev.Err)
 			} else {
