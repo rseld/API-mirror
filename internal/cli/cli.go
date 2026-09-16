@@ -31,11 +31,15 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 			if len(parts) > 1 {
 				arg = parts[1]
 			}
-			log.Printf("received command: %q", line)
+			if logging.Enabled(logging.Normal) {
+				log.Printf("received command: %q", line)
+			}
 
 			switch cmd {
 			case "status":
-				log.Println("action: status")
+				if logging.Enabled(logging.Normal) {
+					log.Println("action: status")
+				}
 				for name, instance := range instances {
 					if arg != "" && name != arg {
 						continue
@@ -44,7 +48,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 				}
 
 			case "routes":
-				log.Println("action: routes")
+				if logging.Enabled(logging.Normal) {
+					log.Println("action: routes")
+				}
 				for name, instance := range instances {
 					if arg != "" && name != arg {
 						continue
@@ -56,7 +62,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 
 			case "quit":
 				force := arg == "--force"
-				log.Printf("action: quit force: %t", force)
+				if logging.Enabled(logging.Normal) {
+					log.Printf("action: quit force: %t", force)
+				}
 				pending := map[string]bool{}
 				for name, instance := range instances {
 					if !instance.Running {
@@ -104,7 +112,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					log.Println("usage: reload <name>")
 					break
 				}
-				log.Println("action: reload")
+				if logging.Enabled(logging.Normal) {
+					log.Println("action: reload")
+				}
 				instance, ok := instances[arg]
 				if !ok {
 					log.Printf("unknown instance %q", arg)
@@ -143,7 +153,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 				newInstance.Running = true
 				instances[arg] = newInstance
 				newInstance.Start(serverEvents)
-				log.Printf("action: start %s", arg)
+				if logging.Enabled(logging.Normal) {
+					log.Printf("action: start %s", arg)
+				}
 
 			case "stop":
 				if arg == "" {
@@ -159,7 +171,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					log.Printf("stop failed: %s not running", arg)
 					break
 				}
-				log.Printf("action: stop %s", arg)
+				if logging.Enabled(logging.Normal) {
+					log.Printf("action: stop %s", arg)
+				}
 				go func() {
 					ctx, cancel := context.WithTimeout(context.Background(), server.ShutdownTimeout)
 					defer cancel()
@@ -184,7 +198,9 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					log.Println("usage: log <quiet|normal|verbose>")
 				}
 				if ok {
-					log.Printf("action: log %s", arg)
+					if logging.Enabled(logging.Normal) {
+						log.Printf("action: log %s", arg)
+					}
 				}
 
 			default:
