@@ -2,6 +2,7 @@ package cli
 
 import (
 	"API-mirror/internal/config"
+	"API-mirror/internal/logging"
 	"API-mirror/internal/server"
 	"bufio"
 	"context"
@@ -39,7 +40,7 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					if arg != "" && name != arg {
 						continue
 					}
-					log.Printf(" %s: %s running: %t", name, instance.Server.Addr, instance.Running)
+					log.Printf(" %s: port%s running: %t", name, instance.Server.Addr, instance.Running)
 				}
 
 			case "routes":
@@ -55,7 +56,7 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 
 			case "quit":
 				force := arg == "--force"
-				log.Println("action: quit force: %t", force)
+				log.Printf("action: quit force: %t", force)
 				pending := map[string]bool{}
 				for name, instance := range instances {
 					if !instance.Running {
@@ -78,13 +79,13 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 				for len(pending) > 0 {
 					select {
 					case ev := <-serverEvents:
-						if !pending[ev.Name] {
-							log.Printf("quit: unexpected event from %q", ev.Name)
+						if !pending[ev.Instance.Name] {
+							log.Printf("quit: unexpected event from %q", ev.Instance.Name)
 							continue
 						}
-						results[ev.Name] = ev.Err
-						delete(pending, ev.Name)
-						log.Printf("quit: %s stopped (err=%v)", ev.Name, ev.Err)
+						results[ev.Instance.Name] = ev.Err
+						delete(pending, ev.Instance.Name)
+						log.Printf("quit: %s stopped (err=%v)", ev.Instance.Name, ev.Err)
 
 					case <-timeout:
 						names := make([]string, 0, len(pending))
@@ -165,28 +166,43 @@ func RunSelectLoop(instances map[string]*server.ServerInstance, cliInput <-chan 
 					if err := instance.Stop(ctx); err != nil {
 						log.Printf("stop %s: shutdown error: %v", instance.Name, err)
 					}
-
 				}()
 
 			case "log":
-				log.Printf("action: %s (unimplemented)", cmd)
+				var ok bool
+				switch arg {
+				case "quiet":
+					logging.Set(logging.Quiet)
+					ok = true
+				case "normal":
+					logging.Set(logging.Normal)
+					ok = true
+				case "verbose":
+					logging.Set(logging.Verbose)
+					ok = true
+				default:
+					log.Println("usage: log <quiet|normal|verbose>")
+				}
+				if ok {
+					log.Printf("action: log %s", arg)
+				}
 
 			default:
 				log.Printf("action: unknown command %q", cmd)
 			}
 
 		case ev := <-serverEvents:
-			instance, ok := instances[ev.Name]
-			if !ok {
-				log.Printf("event from unknown instance %q", ev.Name)
+			current, ok := instances[ev.Instance.Name]
+			if !ok || current != ev.Instance {
+				log.Printf("stale event from replaced %q, ignoring", ev.Instance.Name)
 				break
 			}
-			instance.Running = false
+			ev.Instance.Running = false
 
 			if ev.Err != nil {
-				log.Printf("server %s failed: %v", ev.Name, ev.Err)
+				log.Printf("server %s failed: %v", ev.Instance.Name, ev.Err)
 			} else {
-				log.Printf("server %s stopped cleanly", ev.Name)
+				log.Printf("server %s stopped cleanly", ev.Instance.Name)
 			}
 		}
 	}

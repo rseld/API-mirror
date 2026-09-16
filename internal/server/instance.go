@@ -32,24 +32,29 @@ type ServerInstance struct {
 }
 
 type ServerEvent struct {
-	Name string
-	Err  error
+	Instance *ServerInstance
+	Err      error
 }
 
-func startServer(name string, server *http.Server, events chan<- ServerEvent) {
+/* Some design consequences that went unnoticed during the initial architecting
+led to this function now crossing the boundary of no package should mutate objects that don't
+belong to them. instance belongs to the cli package and should not be mutated here. A hard
+limitation for preventing this will be investigated later */
+
+func startServer(instance *ServerInstance, events chan<- ServerEvent) {
 	go func() {
-		err := server.ListenAndServe()
+		err := instance.Server.ListenAndServe()
 		if errors.Is(err, http.ErrServerClosed) {
-			events <- ServerEvent{Name: name, Err: nil}
+			events <- ServerEvent{Instance: instance, Err: nil}
 			return
 		}
-		events <- ServerEvent{Name: name, Err: err}
+		events <- ServerEvent{Instance: instance, Err: err}
 	}()
 }
 
 func (s *ServerInstance) Start(events chan<- ServerEvent) {
-	startServer(s.Name, s.Server, events)
 	s.Running = true
+	startServer(s, events)
 }
 
 func (s *ServerInstance) Stop(ctx context.Context) error {
